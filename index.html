@@ -21,6 +21,12 @@
     <div class="card">
         <label>対象月</label>
         <input type="month" id="monthPicker">
+
+        <label>バイト設定 (A:開始時間 / B:終了時間)</label>
+        <div style="display:flex; gap:10px;">
+            <input type="time" id="startbeit" value="06:00">
+            <input type="time" id="endbeit" value="09:00">
+        </div>
         
         <label>バイト日 (1, 3, 5...)</label>
         <input type="text" id="workDays" placeholder="数字をカンマで入力">
@@ -36,8 +42,8 @@
         </div>
         <label>起床設定 (A:通常 / B:バイト当日)</label>
         <div style="display:flex; gap:10px;">
-            <input type="time" id="sleepC" value="07:00">
-            <input type="time" id="sleepD" value="05:00">
+            <input type="time" id="wakeA" value="07:00">
+            <input type="time" id="wakeB" value="05:00">
         </div>
         <div id="status">日程を確定してください</div>
     </div>
@@ -73,6 +79,12 @@
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
 
+            const wA = document.getElementById('wakeA').value;
+            const wB = document.getElementById('wakeB').value;
+
+            const st = document.getElementById('startbeit').value;
+            const en = document.getElementById('endbeit').value;
+
             const btn = document.querySelector('.btn-send');
             btn.disabled = true;
             btn.innerText = "送信中...";
@@ -104,7 +116,7 @@
                 });
 
                 // --- 2. 起床 (生活DB) ---
-                const wakeTime = isTodayWork ? "05:00" : "07:00";
+                const wakeTime = isTodayWork ? wB : wA;
                 await postData({
                     db_type: "sleep",
                     title: "起床",
@@ -120,7 +132,7 @@
                     end_date: `${dateStr}T12:45:00`
                 });
 
-                // --- 4. 夕食・風呂 (生活DB / 火・金は洗濯) ---
+                // --- 4. 夕食・風呂 (生活DB / 火・金は洗濯 / 水・土は洗濯とりこみ) ---
                 let dinnerTitle = "夕食・風呂";
                 if (dayOfWeek === 2 || dayOfWeek === 5) dinnerTitle = "夕食・風呂（洗濯）";
                 if (dayOfWeek === 3 || dayOfWeek === 6) dinnerTitle = "夕食・風呂（洗濯とりこみ）";
@@ -132,12 +144,14 @@
                 });
 
                 // --- 5. バイト本体 (バイトDB) ---
+                const startbeittime = st;
+                const endbeittime = en;
                 if (isTodayWork) {
                     await postData({
                         db_type: "work",
                         title: "セブンバイト",
-                        start_date: `${dateStr}T06:00:00`,
-                        end_date: `${dateStr}T09:00:00`
+                        start_date: `${dateStr}T${startbeittime}:00`,
+                        end_date: `${dateStr}T${endbeittime}:00`
                     });
                 }
 
