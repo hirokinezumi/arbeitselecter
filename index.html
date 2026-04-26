@@ -2,103 +2,68 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notion Bulk Logger</title>
+    <title>Notion Dual DB Logger</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f7f9; color: #333; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h3 { margin-top: 0; color: #007bff; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; color: #555; }
-        input { width: 100%; padding: 12px; margin-bottom: 18px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-        input:focus { border-color: #007bff; outline: none; box-shadow: 0 0 0 2px rgba(0,123,255,0.1); }
-        
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1rem; transition: background 0.2s; margin-bottom: 10px; }
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f7f9; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h3 { color: #007bff; margin-top: 0; }
+        label { display: block; font-size: 0.8rem; font-weight: bold; margin: 10px 0 5px; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .btn-add { background: #28a745; color: white; }
-        .btn-add:hover { background: #218838; }
-        .btn-send { background: #007bff; color: white; margin-top: 10px; }
-        .btn-send:hover { background: #0069d9; }
-        
-        #status { padding: 15px; background: #e9ecef; border-radius: 8px; font-size: 0.9rem; min-height: 40px; border: 1px solid #dee2e6; color: #495057; line-height: 1.4; }
-        .time-group { display: flex; gap: 15px; }
-        .time-group div { flex: 1; }
+        .btn-send { background: #007bff; color: white; margin-top: 15px; }
+        #status { margin-top: 15px; padding: 10px; background: #eee; border-radius: 6px; font-size: 0.85rem; min-height: 40px; }
     </style>
 </head>
 <body>
-    <h3>📅 Notion一括登録</h3>
+    <h3>📅 2つのDBへ振分登録</h3>
 
     <div class="card">
-        <label>1. 対象の月を選択</label>
+        <label>対象月</label>
         <input type="month" id="monthPicker">
         
-        <label>2. バイトの日付 (例: 1, 3, 15, 20)</label>
-        <input type="text" id="workDays" placeholder="数字をカンマ(,)で区切って入力">
+        <label>バイト日 (1, 3, 5...)</label>
+        <input type="text" id="workDays" placeholder="数字とカンマで入力">
         
-        <button class="btn btn-add" onclick="confirmDays()">日程を確定する</button>
+        <button class="btn btn-add" onclick="confirmDays()" style="margin-top:10px;">日程を確定</button>
     </div>
 
     <div class="card">
-        <label>3. 就寝時間の指定</label>
-        <div class="time-group">
-            <div>
-                <label>通常(A)</label>
-                <input type="time" id="sleepA" value="23:30">
-            </div>
-            <div>
-                <label>バイト前夜(B)</label>
-                <input type="time" id="sleepB" value="22:00">
-            </div>
+        <label>就寝設定 (A:通常 / B:バイト前夜)</label>
+        <div style="display:flex; gap:10px;">
+            <input type="time" id="sleepA" value="23:30">
+            <input type="time" id="sleepB" value="22:00">
         </div>
-        <div id="status">ここに確定した内容が表示されます</div>
+        <div id="status">日程を確定してください</div>
     </div>
 
-    <button class="btn btn-send" onclick="sendToNotion()">Notionへ一括送信開始</button>
+    <button class="btn btn-send" onclick="sendToNotion()">Notionへ送信 (DB振分実行)</button>
 
     <script>
         let selectedWorkDays = [];
 
-        // 初期設定：翌月をデフォルトにする（予定登録のため）
         window.onload = () => {
             const now = new Date();
             const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             document.getElementById('monthPicker').value = nextMonth.toISOString().substring(0, 7);
         };
 
-        // 日程確定処理
         function confirmDays() {
             const input = document.getElementById('workDays').value;
-            if (!input) {
-                alert("バイトの日付を入力してください");
-                return;
-            }
-            
-            selectedWorkDays = input.split(/[,、\s]+/)
-                                   .map(d => parseInt(d))
-                                   .filter(d => !isNaN(d))
-                                   .sort((a, b) => a - b);
-
-            document.getElementById('status').innerHTML = 
-                `<strong>確定済み:</strong> ${selectedWorkDays.join(", ")}日<br>` +
-                `<small>※前日の就寝は「B時間」になります</small>`;
+            if (!input) return alert("日付を入力してください");
+            selectedWorkDays = input.split(/[,、\s]+/).map(d => parseInt(d)).filter(d => !isNaN(d)).sort((a,b) => a-b);
+            document.getElementById('status').innerText = "確定済み: " + selectedWorkDays.join(", ") + "日";
         }
 
-        // 送信メイン処理
         async function sendToNotion() {
-            if (selectedWorkDays.length === 0) {
-                alert("先に「日程を確定する」ボタンを押してください");
-                return;
-            }
-
-            const confirmSend = confirm("1ヶ月分のデータを送信します。よろしいですか？");
-            if (!confirmSend) return;
-
+            if (selectedWorkDays.length === 0) return alert("日程を確定してください");
+            
             const monthStr = document.getElementById('monthPicker').value;
             const [year, month] = monthStr.split('-').map(Number);
             const lastDay = new Date(year, month, 0).getDate();
-            
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
-            
-            let successCount = 0;
+
             const btn = document.querySelector('.btn-send');
             btn.disabled = true;
             btn.innerText = "送信中...";
@@ -106,52 +71,43 @@
             for (let day = 1; day <= lastDay; day++) {
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // --- 1. 就寝予定の送信 ---
+                // 1. 就寝予定 (db_type: sleep)
                 const isNextDayWork = selectedWorkDays.includes(day + 1);
                 const sleepTime = isNextDayWork ? sB : sA;
-                
                 await postData({
+                    db_type: "sleep",
                     title: isNextDayWork ? "就寝(B)" : "就寝(A)",
                     start_date: `${dateStr}T${sleepTime}:00`,
-                    end_date: `${dateStr}T23:59:59`, // 終了は同日内
-                    type: "Sleep"
+                    end_date: `${dateStr}T23:59:59`
                 });
-                successCount++;
 
-                // --- 2. バイト予定の送信（当日がバイトなら） ---
+                // 2. バイト予定 (db_type: work)
                 if (selectedWorkDays.includes(day)) {
                     await postData({
+                        db_type: "work",
                         title: "セブン",
                         start_date: `${dateStr}T06:00:00`,
-                        end_date: `${dateStr}T09:00:00`,
-                        type: "Work"
+                        end_date: `${dateStr}T09:00:00`
                     });
-                    successCount++;
                 }
-                
-                document.getElementById('status').innerText = `${day}日目まで送信完了... (${successCount}件完了)`;
+                document.getElementById('status').innerText = `${day}日目まで送信中...`;
             }
 
-            alert(`完了！ 合計 ${successCount} 件をNotionに登録しました。`);
-            document.getElementById('status').innerText = "すべての送信が完了しました。";
+            alert("振分送信が完了しました！");
+            document.getElementById('status').innerText = "完了しました。";
             btn.disabled = false;
-            btn.innerText = "Notionへ一括送信開始";
+            btn.innerText = "Notionへ送信 (DB振分実行)";
         }
 
-        // Webhookへの個別POST関数
         async function postData(payload) {
-            const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
             try {
-                await fetch(webhookUrl, {
+                await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                // 連続送信によるサーバー負荷軽減のため少しだけ待機(0.1秒)
-                await new Promise(resolve => setTimeout(resolve, 100));
-            } catch (err) {
-                console.error("Post Error:", err);
-            }
+                await new Promise(r => setTimeout(r, 100)); 
+            } catch (e) { console.error(e); }
         }
     </script>
 </body>
