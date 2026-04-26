@@ -70,6 +70,7 @@
     <script>
         let selectedWorkDays = [];
         let selectedLaundryDays = [2, 5]; // デフォルト火・金
+        let selectedCollectionDays = selectedLaundryDays.map(day => (day + 1) % 7);
 
         window.onload = () => {
             const now = new Date();
@@ -80,11 +81,21 @@
         // 曜日のトグル
         function toggleDay(btn, dayIndex) {
             btn.classList.toggle('active');
+            
+            // 1. 洗濯日の配列を更新
             if (selectedLaundryDays.includes(dayIndex)) {
                 selectedLaundryDays = selectedLaundryDays.filter(d => d !== dayIndex);
             } else {
                 selectedLaundryDays.push(dayIndex);
             }
+        
+            // 2. 変更に追従して「とりこみ日」を再計算
+            // これで常に最新の洗濯日の「翌日」がセットされます
+            let selectedCollectionDays = selectedLaundryDays.map(day => (day + 1) % 7);
+            
+            // デバッグ用にコンソールに出すと安心です
+            // console.log("洗濯日:", selectedLaundryDays);
+            // console.log("とりこみ日:", selectedCollectionDays);
         }
 
         function confirmDays() {
