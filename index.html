@@ -104,6 +104,7 @@
             btn.disabled = true;
             btn.innerText = "送信中...";
 
+            // 0から末日までループ
             for (let i = 0; i <= totalDays; i++) {
                 const targetDate = new Date(year, month - 1, i);
                 const dateStr = formatDate(targetDate);
@@ -120,12 +121,14 @@
                     const isTomorrowWork = (tomorrow.getMonth() + 1 === month) && selectedWorkDays.includes(tomorrow.getDate());
                     const sleepTime = isTomorrowWork ? sB : sA;
                     
+                    // await をつけて Make からの応答を待つ
                     await postData({
                         db_type: "sleep", title: "就寝",
                         start_date: `${dateStr}T${sleepTime}:00`,
                         end_date: `${dateStr}T${addMinutesToTime(sleepTime, 45)}:00`
                     });
-                    await new Promise(r => setTimeout(r, 1500)); // 待ち時間を長く
+                    // 次の送信まで 1秒休む
+                    await new Promise(r => setTimeout(r, 1000));
                 }
 
                 // --- 2. 起床・食事・バイト ---
@@ -133,40 +136,37 @@
                     const isTodayWork = (targetDate.getMonth() + 1 === month) && selectedWorkDays.includes(dayNum);
 
                     // 起床
-                    const wakeTime = isTodayWork ? wB : wA;
-                    await postData({ db_type: "sleep", title: "起床", start_date: `${dateStr}T${wakeTime}:00`, end_date: `${dateStr}T${addMinutesToTime(wakeTime, 45)}:00` });
-                    await new Promise(r => setTimeout(r, 1500));
+                    await postData({ db_type: "sleep", title: "起床", start_date: `${dateStr}T${isTodayWork ? wB : wA}:00`, end_date: `${dateStr}T${addMinutesToTime(isTodayWork ? wB : wA, 45)}:00` });
+                    await new Promise(r => setTimeout(r, 1000));
 
                     // 昼食
                     await postData({ db_type: "sleep", title: "昼食休憩", start_date: `${dateStr}T12:00:00`, end_date: `${dateStr}T12:45:00` });
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 1000));
 
                     // 夕食・洗濯・とりこみ
                     let dinnerTitle = "夕食・風呂";
                     const yesterday = new Date(targetDate);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    
                     if (selectedLaundryDays.includes(dayOfWeek)) dinnerTitle = "夕食・風呂・洗濯";
                     else if (selectedLaundryDays.includes(yesterday.getDay())) dinnerTitle = "洗濯とりこみ・夕食・風呂";
 
                     await postData({ db_type: "sleep", title: dinnerTitle, start_date: `${dateStr}T20:00:00`, end_date: `${dateStr}T20:45:00` });
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 1000));
 
                     // バイト
                     if (isTodayWork) {
                         await postData({ db_type: "work", title: "セブンバイト", start_date: `${dateStr}T${stA}:00`, end_date: `${dateStr}T${enB}:00` });
-                        await new Promise(r => setTimeout(r, 1500));
+                        await new Promise(r => setTimeout(r, 1000));
                     }
                 }
-
-                statusDisp.innerText = `${dateStr} 送信完了...\n(Makeのパンクを防ぐためゆっくり送信しています)`;
+                statusDisp.innerText = `${dateStr} 処理中...\n(行列エラー回避のため、1件ずつ順番に送っています)`;
             }
 
-            alert("すべてのデータ送信が完了しました！");
+            alert("すべての登録が完了しました！");
             btn.disabled = false;
             btn.innerText = "2. Notionへ送信";
         }
-
+        
         function formatDate(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
