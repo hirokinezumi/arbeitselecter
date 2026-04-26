@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <h3>📅 生活ルーティン一括登録</h3>
+    <h3>📅 バイト・生活一括登録</h3>
 
     <div class="card">
         <label>対象月</label>
@@ -31,7 +31,7 @@
     <div class="card">
         <label>就寝設定 (A:通常 / B:バイト前夜)</label>
         <div style="display:flex; gap:10px;">
-            <input type="time" id="sleepA" value="23:30">
+            <input type="time" id="sleepA" value="23:00">
             <input type="time" id="sleepB" value="22:00">
         </div>
         <div id="status">日程を確定してください</div>
@@ -93,7 +93,7 @@
                 const sleepTime = isTomorrowWork ? sB : sA;
                 await postData({
                     db_type: "sleep",
-                    title: isTomorrowWork ? "就寝(B)" : "就寝(A)",
+                    title: isTomorrowWork ? "就寝" : "就寝",
                     start_date: `${dateStr}T${sleepTime}:00`,
                     end_date: `${dateStr}T${addMinutesToTime(sleepTime, 45)}:00`
                 });
