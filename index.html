@@ -92,9 +92,7 @@
             const monthVal = document.getElementById('monthPicker').value;
             const [year, month] = monthVal.split('-').map(Number);
             
-            // ループ用の日付設定
-            const startDate = new Date(year, month - 1, 0); // 前月末日
-            const endDate = new Date(year, month, 0);       // 今月最終日
+            const endDate = new Date(year, month, 0);
             const totalDays = endDate.getDate();
 
             const sA = document.getElementById('sleepA').value, sB = document.getElementById('sleepB').value;
@@ -102,21 +100,20 @@
             const stA = document.getElementById('startA').value, enB = document.getElementById('endB').value;
 
             const btn = document.querySelector('.btn-send');
+            const statusDisp = document.getElementById('status');
             btn.disabled = true;
             btn.innerText = "送信中...";
 
-            // 0から末日までループ (0は前月末日)
             for (let i = 0; i <= totalDays; i++) {
                 const targetDate = new Date(year, month - 1, i);
                 const dateStr = formatDate(targetDate);
                 const dayNum = targetDate.getDate();
-                const currentMonth = targetDate.getMonth() + 1;
                 const dayOfWeek = targetDate.getDay();
 
                 const isPrevMonthFinal = (i === 0);
                 const isThisMonthFinal = (i === totalDays);
 
-                // --- 1. 就寝 (今月最終日以外) ---
+                // --- 1. 就寝 ---
                 if (!isThisMonthFinal) {
                     const tomorrow = new Date(targetDate);
                     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -124,47 +121,48 @@
                     const sleepTime = isTomorrowWork ? sB : sA;
                     
                     await postData({
-                        db_type: "sleep",
-                        title: "就寝",
+                        db_type: "sleep", title: "就寝",
                         start_date: `${dateStr}T${sleepTime}:00`,
                         end_date: `${dateStr}T${addMinutesToTime(sleepTime, 45)}:00`
                     });
+                    await new Promise(r => setTimeout(r, 1500)); // 待ち時間を長く
                 }
 
-                // --- 2. 起床・食事・バイト (前月末日以外) ---
+                // --- 2. 起床・食事・バイト ---
                 if (!isPrevMonthFinal) {
-                    const isTodayWork = (currentMonth === month) && selectedWorkDays.includes(dayNum);
+                    const isTodayWork = (targetDate.getMonth() + 1 === month) && selectedWorkDays.includes(dayNum);
 
                     // 起床
                     const wakeTime = isTodayWork ? wB : wA;
                     await postData({ db_type: "sleep", title: "起床", start_date: `${dateStr}T${wakeTime}:00`, end_date: `${dateStr}T${addMinutesToTime(wakeTime, 45)}:00` });
+                    await new Promise(r => setTimeout(r, 1500));
 
                     // 昼食
                     await postData({ db_type: "sleep", title: "昼食休憩", start_date: `${dateStr}T12:00:00`, end_date: `${dateStr}T12:45:00` });
+                    await new Promise(r => setTimeout(r, 1500));
 
                     // 夕食・洗濯・とりこみ
                     let dinnerTitle = "夕食・風呂";
-                    const isLaundryDay = selectedLaundryDays.includes(dayOfWeek);
                     const yesterday = new Date(targetDate);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    const wasLaundryYesterday = selectedLaundryDays.includes(yesterday.getDay());
-
-                    if (isLaundryDay) dinnerTitle = "夕食・風呂・洗濯";
-                    else if (wasLaundryYesterday) dinnerTitle = "夕食・風呂・洗濯とりこみ";
+                    
+                    if (selectedLaundryDays.includes(dayOfWeek)) dinnerTitle = "夕食・風呂・洗濯";
+                    else if (selectedLaundryDays.includes(yesterday.getDay())) dinnerTitle = "洗濯とりこみ・夕食・風呂";
 
                     await postData({ db_type: "sleep", title: dinnerTitle, start_date: `${dateStr}T20:00:00`, end_date: `${dateStr}T20:45:00` });
+                    await new Promise(r => setTimeout(r, 1500));
 
                     // バイト
                     if (isTodayWork) {
                         await postData({ db_type: "work", title: "セブンバイト", start_date: `${dateStr}T${stA}:00`, end_date: `${dateStr}T${enB}:00` });
+                        await new Promise(r => setTimeout(r, 1500));
                     }
                 }
 
-                document.getElementById('status').innerText = `${dateStr} 完了...`;
-                await new Promise(r => setTimeout(r, 500)); // 少し間隔を空ける
+                statusDisp.innerText = `${dateStr} 送信完了...\n(Makeのパンクを防ぐためゆっくり送信しています)`;
             }
 
-            alert("完了しました！");
+            alert("すべてのデータ送信が完了しました！");
             btn.disabled = false;
             btn.innerText = "2. Notionへ送信";
         }
