@@ -2,13 +2,19 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Notion Life Logger - Precise Range</title>
+    <title>Notion Life Logger - Full Routine</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f7f9; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h3 { color: #007bff; margin-top: 0; }
         label { display: block; font-size: 0.8rem; font-weight: bold; margin: 10px 0 5px; }
         input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        
+        /* 曜日ボタンのスタイル */
+        .day-selector { display: flex; gap: 5px; justify-content: space-between; margin-bottom: 10px; }
+        .day-btn { flex: 1; padding: 8px 0; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+        .day-btn.active { background: #007bff; color: white; border-color: #007bff; font-weight: bold; }
+
         .btn { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .btn-add { background: #28a745; color: white; }
         .btn-send { background: #007bff; color: white; margin-top: 15px; }
@@ -16,7 +22,7 @@
     </style>
 </head>
 <body>
-    <h3>📅 バイト・生活一括登録</h3>
+    <h3>📅 バイト・生活一括登録（うおw）</h3>
 
     <div class="card">
         <label>対象月</label>
@@ -44,6 +50,18 @@
             <input type="time" id="wakeA" value="07:00">
             <input type="time" id="wakeB" value="05:00">
         </div>
+
+        <label>洗濯をする曜日を選択</label>
+        <div class="day-selector" id="laundryDays">
+            <button class="day-btn" onclick="toggleDay(this, 0)">日</button>
+            <button class="day-btn" onclick="toggleDay(this, 1)">月</button>
+            <button class="day-btn active" onclick="toggleDay(this, 2)">火</button>
+            <button class="day-btn" onclick="toggleDay(this, 3)">水</button>
+            <button class="day-btn" onclick="toggleDay(this, 4)">木</button>
+            <button class="day-btn active" onclick="toggleDay(this, 5)">金</button>
+            <button class="day-btn" onclick="toggleDay(this, 6)">土</button>
+        </div>
+
         <div id="status">日程を確定してください</div>
     </div>
 
@@ -51,12 +69,23 @@
 
     <script>
         let selectedWorkDays = [];
+        let selectedLaundryDays = [2, 5]; // デフォルト火・金
 
         window.onload = () => {
             const now = new Date();
             const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             document.getElementById('monthPicker').value = nextMonth.toISOString().substring(0, 7);
         };
+
+        // 曜日のトグル
+        function toggleDay(btn, dayIndex) {
+            btn.classList.toggle('active');
+            if (selectedLaundryDays.includes(dayIndex)) {
+                selectedLaundryDays = selectedLaundryDays.filter(d => d !== dayIndex);
+            } else {
+                selectedLaundryDays.push(dayIndex);
+            }
+        }
 
         function confirmDays() {
             const input = document.getElementById('workDays').value;
@@ -77,10 +106,8 @@
 
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
-
             const wA = document.getElementById('wakeA').value;
             const wB = document.getElementById('wakeB').value;
-
             const stA = document.getElementById('startA').value;
             const enB = document.getElementById('endB').value;
 
@@ -88,7 +115,6 @@
             btn.disabled = true;
             btn.innerText = "送信中...";
 
-            // 0: 前月末日, 1〜末日: 当月
             for (let dayOffset = 0; dayOffset <= totalDaysInMonth; dayOffset++) {
                 let targetDate = new Date(year, month - 1, dayOffset);
                 if(dayOffset === 0) targetDate = lastDayOfPrevMonth;
@@ -97,11 +123,9 @@
                 const dayNum = targetDate.getDate();
                 const isPreMonth = dayOffset === 0;
                 const isLastDay = dayOffset === totalDaysInMonth;
-                const isThisMonth = !isPreMonth && !isLastDay || (dayOffset > 0 && dayOffset <= totalDaysInMonth);
                 const dayOfWeek = targetDate.getDay();
 
-                // --- A. 就寝 (生活DB) ---
-                // 前月末日〜今月最終日の一日前まで送信
+                // --- 1. 就寝 (生活DB) ---
                 if (!isLastDay) {
                     const tomorrow = new Date(targetDate);
                     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -110,51 +134,45 @@
                     
                     await postData({
                         db_type: "sleep",
-                        title: isTomorrowWork ? "就寝" : "就寝",
+                        title: "就寝",
                         start_date: `${dateStr}T${sleepTime}:00`,
                         end_date: `${dateStr}T${addMinutesToTime(sleepTime, 45)}:00`
                     });
                 }
 
-                // --- B. その他のルーティン (前月末日はスキップ) ---
+                // --- 2. その他ルーティン (前月末はスキップ) ---
                 if (!isPreMonth) {
                     const isTodayWork = selectedWorkDays.includes(dayNum);
 
-                    // 1. 起床
+                    // 起床
                     const wakeTime = isTodayWork ? wB : wA;
                     await postData({
-                        db_type: "sleep",
-                        title: "起床",
+                        db_type: "sleep", title: "起床",
                         start_date: `${dateStr}T${wakeTime}:00`,
                         end_date: `${dateStr}T${addMinutesToTime(wakeTime, 45)}:00`
                     });
 
-                    // 2. 昼食休憩
+                    // 昼食休憩
                     await postData({
-                        db_type: "sleep",
-                        title: "昼食休憩",
+                        db_type: "sleep", title: "昼食休憩",
                         start_date: `${dateStr}T12:00:00`,
                         end_date: `${dateStr}T12:45:00`
                     });
 
-                    // 3. 夕食・風呂
-                    let dinnerTitle = (dayOfWeek === 2 || dayOfWeek === 5) ? "夕食・風呂・洗濯" : "夕食・風呂";
+                    // 夕食・風呂 (選択された曜日なら洗濯を追加)
+                    let dinnerTitle = selectedLaundryDays.includes(dayOfWeek) ? "夕食・風呂・洗濯" : "夕食・風呂";
                     await postData({
-                        db_type: "sleep",
-                        title: dinnerTitle,
+                        db_type: "sleep", title: dinnerTitle,
                         start_date: `${dateStr}T20:00:00`,
                         end_date: `${dateStr}T20:45:00`
                     });
 
-                    // 4. バイト本体 (バイトDB)
+                    // バイト本体
                     if (isTodayWork) {
-                        const stbeit = stA;
-                        const enbeit = enB;
                         await postData({
-                            db_type: "work",
-                            title: "セブンバイト",
-                            start_date: `${dateStr}T${stbeit}:00`,
-                            end_date: `${dateStr}T${enbeit}:00`
+                            db_type: "work", title: "セブンバイト",
+                            start_date: `${dateStr}T${stA}:00`,
+                            end_date: `${dateStr}T${enB}:00`
                         });
                     }
                 }
@@ -163,9 +181,10 @@
                 await new Promise(r => setTimeout(r, 400));
             }
 
-            alert("指定範囲での登録が完了しました！");
+            alert("登録が完了しました！");
             document.getElementById('status').innerText = "すべて完了しました。";
             btn.disabled = false;
+            btn.innerText = "2. Notionへ送信";
         }
 
         function formatDate(date) {
