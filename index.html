@@ -89,44 +89,50 @@
             renderPreview();
         }
 
-        async function generateAndSend() {
-            const monthVal = monthInput.value;
-            if (!monthVal || workDaysArray.length === 0) return alert("月とバイト日を指定してください");
+async function generateAndSend() {
+    const monthVal = monthInput.value;
+    if (!monthVal || workDaysArray.length === 0) return alert("月とバイト日を指定してください");
 
-            const [year, month] = monthVal.split('-').map(Number);
-            const lastDay = new Date(year, month, 0).getDate(); // 月末日を取得
-            
-            const sleepA = document.getElementById('sleepA').value;
-            const sleepB = document.getElementById('sleepB').value;
-            const workStart = document.getElementById('workStart').value;
-            const workEnd = document.getElementById('workEnd').value;
+    const [year, month] = monthVal.split('-').map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    
+    const sleepA = document.getElementById('sleepA').value;
+    const sleepB = document.getElementById('sleepB').value;
+    const workStart = document.getElementById('workStart').value;
+    const workEnd = document.getElementById('workEnd').value;
 
-            const finalPayload = [];
+    const finalPayload = [];
 
-            for (let day = 1; day <= lastDay; day++) {
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
-                // 1. バイトの予定（その日がバイトなら追加）
-                if (workDaysArray.includes(day)) {
-                    finalPayload.push({
-                        date: dateStr,
-                        type: "Work",
-                        start: workStart,
-                        end: workEnd,
-                        title: "バイト"
-                    });
-                }
+    for (let day = 1; day <= lastDay; day++) {
+        const datePrefix = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // バイトの予定
+        if (workDaysArray.includes(day)) {
+            finalPayload.push({
+                title: "セブン",
+                // ISO形式に結合 (YYYY-MM-DDTHH:mm:00)
+                start_date: `${datePrefix}T${workStart}:00`,
+                end_date: `${datePrefix}T${workEnd}:00`,
+                type: "Work"
+            });
+        }
 
-                // 2. 就寝時間の予定（翌日がバイトならB、それ以外はA）
-                const isNextDayWork = workDaysArray.includes(day + 1);
-                finalPayload.push({
-                    date: dateStr,
-                    type: "Sleep",
-                    start: isNextDayWork ? sleepB : sleepA,
-                    end: "06:00", // 起床時間は固定または調整
-                    title: isNextDayWork ? "就寝(B時間)" : "就寝(A時間)"
-                });
-            }
+        // 就寝時間の予定（翌日がバイトならB、それ以外はA）
+        const isNextDayWork = workDaysArray.includes(day + 1);
+        const sleepTime = isNextDayWork ? sleepB : sleepA;
+        
+        finalPayload.push({
+            title: isNextDayWork ? "就寝(B時間)" : "就寝(A時間)",
+            start_date: `${datePrefix}T${sleepTime}:00`,
+            // 翌朝6:00に起きる想定なら、日付を+1する必要があるが、
+            // 同日内の23:59などで一旦送るか、日付処理を加える
+            end_date: `${datePrefix}T23:59:00`, 
+            type: "Sleep"
+        });
+    }
+
+    // --- 以下、Webhook送信処理はそのまま ---
+}
 
             // Webhook送信
             const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
