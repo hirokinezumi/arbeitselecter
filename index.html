@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Notion Bulk Logger</title>
+<style>
+body { font-family: sans-serif; padding: 20px; max-width: 400px; }
+.controls { display: flex; gap: 5px; margin-bottom: 10px; }
+input, button { padding: 10px; font-size: 1rem; }
+#dateList { border: 1px solid #ccc; padding: 10px; min-height: 50px; margin-bottom: 10px; border-radius: 4px; }
+.date-tag { display: inline-block; background: #eee; padding: 5px 10px; margin: 5px; border-radius: 15px; font-size: 0.9rem; }
+.btn-add { background: #28a745; color: white; border: none; flex-grow: 1; }
+.btn-send { background: #007bff; color: white; border: none; width: 100%; }
+.btn-clear { background: #dc3545; color: white; border: none; width: 100%; margin-top: 5px; }
+</style>
+</head>
+<body>
+<h3>Notion一括登録</h3>
+<div class="controls">
+    <input type="date" id="datePicker">
+    <button class="btn-add" onclick="addDate()">追加</button>
+</div>
+
+<div id="dateList">（追加された日付がここに並びます）</div>
+
+<button class="btn-send" onclick="sendAllToNotion()">一括送信</button>
+<button class="btn-clear" onclick="clearList()">リストを空にする</button>
+
+<script>
+    let selectedDates = [];
+    document.getElementById('datePicker').valueAsDate = new Date();
+
+    function addDate() {
+        const val = document.getElementById('datePicker').value;
+        if (!val || selectedDates.includes(val)) return;
+        selectedDates.push(val);
+        render();
+    }
+
+    function render() {
+        const container = document.getElementById('dateList');
+        container.innerHTML = selectedDates.length === 0 ? "（空です）" : "";
+        selectedDates.sort().forEach(d => {
+            const span = document.createElement('span');
+            span.className = 'date-tag';
+            span.textContent = d;
+            container.appendChild(span);
+        });
+    }
+
+    function clearList() {
+        selectedDates = [];
+        render();
+    }
+
+    async function sendAllToNotion() {
+        if (selectedDates.length === 0) return alert("日付がありません");
+        const webhookUrl = "<https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct>";
+
+        try {
+            // 配列のまま送信！
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dates: selectedDates })
+            });
+
+            if (response.ok) {
+                alert(selectedDates.length + "件送信しました！");
+                clearList();
+            } else { alert("エラーが発生しました"); }
+        } catch (e) { alert("ネットワークエラー"); }
+    }
+</script>
+</body>
+</html>
