@@ -69,7 +69,7 @@
                 alert("先に「1. 日程を確定する」を押してください");
                 return;
             }
-
+        
             const monthStr = document.getElementById('monthPicker').value;
             const [year, month] = monthStr.split('-').map(Number);
             const lastDay = new Date(year, month, 0).getDate();
@@ -77,31 +77,58 @@
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
             
-            const payload = [];
-
+            // 進行状況を表示
+            document.getElementById('status').innerText = "送信中...";
+            let successCount = 0;
+        
             for (let day = 1; day <= lastDay; day++) {
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // バイト当日 (06:00 - 09:00固定)
+                // --- 1. 就寝予定の作成 ---
+                const isNextDayWork = selectedWorkDays.includes(day + 1);
+                const sleepTime = isNextDayWork ? sB : sA;
+                const sleepData = {
+                    title: isNextDayWork ? "就寝(B時間)" : "就寝(A時間)",
+                    start_date: `${dateStr}T${sleepTime}:00`,
+                    end_date: `${dateStr}T23:59:59`, // 終了時間は同日内
+                    type: "Sleep"
+                };
+                // 送信
+                await postData(sleepData);
+                successCount++;
+        
+                // --- 2. バイト予定の作成（当日がバイトなら） ---
                 if (selectedWorkDays.includes(day)) {
-                    payload.push({
+                    const workData = {
                         title: "セブン",
                         start_date: `${dateStr}T06:00:00`,
                         end_date: `${dateStr}T09:00:00`,
                         type: "Work"
-                    });
+                    };
+                    await postData(workData);
+                    successCount++;
                 }
-
-                // 就寝判定
-                const isNextDayWork = selectedWorkDays.includes(day + 1);
-                const sleepTime = isNextDayWork ? sB : sA;
-                payload.push({
-                    title: isNextDayWork ? "就寝(B)" : "就寝(A)",
-                    start_date: `${dateStr}T${sleepTime}:00`,
-                    end_date: `${dateStr}T23:59:59`,
-                    type: "Sleep"
-                });
+                
+                // 画面上の進捗更新
+                document.getElementById('status').innerText = `${day}日目まで送信完了...`;
             }
+        
+            alert(`合計 ${successCount} 件の登録が完了しました！`);
+            document.getElementById('status').innerText = "すべて完了しました";
+        }
+        
+        // 1件ずつ送信するための補助関数
+        async function postData(data) {
+            try {
+                await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data) // 配列ではなく、1つのオブジェクトとして送る
+                });
+            } catch (e) {
+                console.error("送信エラー:", e);
+            }
+        }
 
             console.log("送信データ:", payload);
 
