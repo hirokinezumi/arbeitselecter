@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Notion Dual DB Logger</title>
+    <title>Notion Dual DB Logger (Custom Wakeup)</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f7f9; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
@@ -13,6 +13,8 @@
         .btn-add { background: #28a745; color: white; }
         .btn-send { background: #007bff; color: white; margin-top: 15px; }
         #status { margin-top: 15px; padding: 10px; background: #eee; border-radius: 6px; font-size: 0.85rem; min-height: 40px; }
+        .time-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .time-field { flex: 1; }
     </style>
 </head>
 <body>
@@ -29,15 +31,33 @@
     </div>
 
     <div class="card">
-        <label>就寝設定 (A:通常 / B:バイト前夜)</label>
-        <div style="display:flex; gap:10px;">
-            <input type="time" id="sleepA" value="23:30">
-            <input type="time" id="sleepB" value="22:00">
+        <label>就寝時間の指定 (開始時刻)</label>
+        <div class="time-row">
+            <div class="time-field">
+                <label>通常(A)</label>
+                <input type="time" id="sleepA" value="23:30">
+            </div>
+            <div class="time-field">
+                <label>バイト前夜(B)</label>
+                <input type="time" id="sleepB" value="22:00">
+            </div>
+        </div>
+
+        <label>起床時間の指定 (終了時刻)</label>
+        <div class="time-row">
+            <div class="time-field">
+                <label>通常時</label>
+                <input type="time" id="wakeNormal" value="23:45">
+            </div>
+            <div class="time-field">
+                <label>バイト当日</label>
+                <input type="time" id="wakeWork" value="22:45">
+            </div>
         </div>
         <div id="status">日程を確定してください</div>
     </div>
 
-    <button class="btn btn-send" onclick="sendToNotion()">Notionへ送信 (DB振分実行)</button>
+    <button class="btn btn-send" onclick="sendToNotion()">Notionへ送信</button>
 
     <script>
         let selectedWorkDays = [];
@@ -61,8 +81,12 @@
             const monthStr = document.getElementById('monthPicker').value;
             const [year, month] = monthStr.split('-').map(Number);
             const lastDay = new Date(year, month, 0).getDate();
+
+            // 設定値の取得
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
+            const wNormal = document.getElementById('wakeNormal').value;
+            const wWork = document.getElementById('wakeWork').value;
 
             const btn = document.querySelector('.btn-send');
             btn.disabled = true;
@@ -71,18 +95,24 @@
             for (let day = 1; day <= lastDay; day++) {
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // 1. 就寝予定 (db_type: sleep)
+                // --- 1. 就寝予定 ---
+                // 開始時刻：明日がバイトならB時間、そうでなければA時間
                 const isNextDayWork = selectedWorkDays.includes(day + 1);
                 const sleepTime = isNextDayWork ? sB : sA;
+
+                // 終了時刻：今日がバイトならバイト用、そうでなければ通常用
+                const isTodayWork = selectedWorkDays.includes(day);
+                const wakeTime = isTodayWork ? wWork : wNormal;
+
                 await postData({
                     db_type: "sleep",
-                    title: isNextDayWork ? "就寝(B)" : "就寝(A)",
+                    title: "就寝",
                     start_date: `${dateStr}T${sleepTime}:00`,
-                    end_date: `${dateStr}T23:59:59`
+                    end_date: `${dateStr}T${wakeTime}:00` // ここを分岐
                 });
 
-                // 2. バイト予定 (db_type: work)
-                if (selectedWorkDays.includes(day)) {
+                // --- 2. バイト予定 ---
+                if (isTodayWork) {
                     await postData({
                         db_type: "work",
                         title: "セブン",
@@ -93,10 +123,10 @@
                 document.getElementById('status').innerText = `${day}日目まで送信中...`;
             }
 
-            alert("振分送信が完了しました！");
+            alert("送信完了！");
             document.getElementById('status').innerText = "完了しました。";
             btn.disabled = false;
-            btn.innerText = "Notionへ送信 (DB振分実行)";
+            btn.innerText = "Notionへ送信";
         }
 
         async function postData(payload) {
