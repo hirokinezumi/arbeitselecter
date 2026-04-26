@@ -1,76 +1,97 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Notion Bulk Logger</title>
-<style>
-body { font-family: sans-serif; padding: 20px; max-width: 400px; }
-.controls { display: flex; gap: 5px; margin-bottom: 10px; }
-input, button { padding: 10px; font-size: 1rem; }
-#dateList { border: 1px solid #ccc; padding: 10px; min-height: 50px; margin-bottom: 10px; border-radius: 4px; }
-.date-tag { display: inline-block; background: #eee; padding: 5px 10px; margin: 5px; border-radius: 15px; font-size: 0.9rem; }
-.btn-add { background: #28a745; color: white; border: none; flex-grow: 1; }
-.btn-send { background: #007bff; color: white; border: none; width: 100%; }
-.btn-clear { background: #dc3545; color: white; border: none; width: 100%; margin-top: 5px; }
-</style>
+    <meta charset="UTF-8">
+    <title>Notion Bulk Logger (Time Support)</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 450px; line-height: 1.5; }
+        .input-group { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dee2e6; }
+        .time-row { display: flex; gap: 10px; margin-top: 10px; }
+        .time-field { flex: 1; }
+        label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 2px; }
+        input { padding: 8px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        
+        .btn-add { background: #28a745; color: white; border: none; width: 100%; padding: 10px; margin-top: 10px; cursor: pointer; border-radius: 4px; }
+        #dateList { border: 1px solid #ccc; padding: 10px; min-height: 50px; margin-bottom: 10px; border-radius: 4px; }
+        .date-item { background: #eee; padding: 8px; margin: 5px 0; border-radius: 4px; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        
+        .btn-send { background: #007bff; color: white; border: none; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        .btn-clear { background: #dc3545; color: white; border: none; width: 100%; margin-top: 5px; padding: 8px; cursor: pointer; border-radius: 4px; }
+    </style>
 </head>
 <body>
-<h3>Notion一括登録</h3>
-<div class="controls">
-    <input type="date" id="datePicker">
-    <button class="btn-add" onclick="addDate()">追加</button>
-</div>
+    <h3>📅 Notion一括登録 (時間指定)</h3>
+    
+    <div class="input-group">
+        <label>日付</label>
+        <input type="date" id="datePicker">
+        
+        <div class="time-row">
+            <div class="time-field">
+                <label>開始</label>
+                <input type="time" id="startTime" value="06:00">
+            </div>
+            <div class="time-field">
+                <label>終了</label>
+                <input type="time" id="endTime" value="09:00">
+            </div>
+        </div>
+        <button class="btn-add" onclick="addSchedule()">リストに追加</button>
+    </div>
 
-<div id="dateList">（追加された日付がここに並びます）</div>
+    <div id="dateList">（追加された予定がここに並びます）</div>
 
-<button class="btn-send" onclick="sendAllToNotion()">一括送信</button>
-<button class="btn-clear" onclick="clearList()">リストを空にする</button>
+    <button class="btn-send" onclick="sendAllToNotion()">一括送信</button>
+    <button class="btn-clear" onclick="clearList()">リストを空にする</button>
 
-<script>
-    let selectedDates = [];
-    document.getElementById('datePicker').valueAsDate = new Date();
+    <script>
+        let schedules = [];
+        document.getElementById('datePicker').valueAsDate = new Date();
 
-    function addDate() {
-        const val = document.getElementById('datePicker').value;
-        if (!val || selectedDates.includes(val)) return;
-        selectedDates.push(val);
-        render();
-    }
+        function addSchedule() {
+            const date = document.getElementById('datePicker').value;
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            
+            if (!date || !start || !end) return alert("全て入力してください");
 
-    function render() {
-        const container = document.getElementById('dateList');
-        container.innerHTML = selectedDates.length === 0 ? "（空です）" : "";
-        selectedDates.sort().forEach(d => {
-            const span = document.createElement('span');
-            span.className = 'date-tag';
-            span.textContent = d;
-            container.appendChild(span);
-        });
-    }
+            schedules.push({ date, start, end });
+            render();
+        }
 
-    function clearList() {
-        selectedDates = [];
-        render();
-    }
-
-    async function sendAllToNotion() {
-        if (selectedDates.length === 0) return alert("日付がありません");
-        const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
-
-        try {
-            // 配列のまま送信！
-            const response = await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dates: selectedDates })
+        function render() {
+            const container = document.getElementById('dateList');
+            container.innerHTML = schedules.length === 0 ? "（空です）" : "";
+            schedules.forEach((s, index) => {
+                const div = document.createElement('div');
+                div.className = 'date-item';
+                div.innerHTML = `<span>${s.date} <b>${s.start} - ${s.end}</b></span>`;
+                container.appendChild(div);
             });
+        }
 
-            if (response.ok) {
-                alert(selectedDates.length + "件送信しました！");
-                clearList();
-            } else { alert("エラーが発生しました"); }
-        } catch (e) { alert("ネットワークエラー"); }
-    }
-</script>
+        function clearList() {
+            schedules = [];
+            render();
+        }
+
+        async function sendAllToNotion() {
+            if (schedules.length === 0) return alert("予定がありません");
+            const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
+
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dates: schedules }) // オブジェクトの配列を送信
+                });
+
+                if (response.ok) {
+                    alert(schedules.length + "件送信しました！");
+                    clearList();
+                } else { alert("エラーが発生しました"); }
+            } catch (e) { alert("ネットワークエラー"); }
+        }
+    </script>
 </body>
 </html>
