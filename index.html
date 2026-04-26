@@ -34,6 +34,11 @@
             <input type="time" id="sleepA" value="23:00">
             <input type="time" id="sleepB" value="22:00">
         </div>
+        <label>就寝設定 (A:通常 / B:バイト前夜)</label>
+        <div style="display:flex; gap:10px;">
+            <input type="time" id="sleepC" value="23:00">
+            <input type="time" id="sleepD" value="22:00">
+        </div>
         <div id="status">日程を確定してください</div>
     </div>
 
@@ -79,7 +84,7 @@
                 const dateStr = formatDate(targetDate);
                 const dayNum = targetDate.getDate();
                 const isThisMonth = targetDate.getMonth() + 1 === month;
-                const dayOfWeek = targetDate.getDay(); // 0:日, 2:火, 5:金
+                const dayOfWeek = targetDate.getDay(); // 0:日, 2:火, 3:水, 5:金, 6:土
 
                 // 明日がバイトか（就寝用）
                 const tomorrow = new Date(targetDate);
@@ -117,12 +122,13 @@
 
                 // --- 4. 夕食・風呂 (生活DB / 火・金は洗濯) ---
                 let dinnerTitle = "夕食・風呂";
-                if (dayOfWeek === 2 || dayOfWeek === 5) dinnerTitle = "夕食・風呂・洗濯";
+                if (dayOfWeek === 2 || dayOfWeek === 5) dinnerTitle = "夕食・風呂（洗濯）";
+                if (dayOfWeek === 3 || dayOfWeek === 6) dinnerTitle = "夕食・風呂（洗濯とりこみ）";
                 await postData({
                     db_type: "sleep",
                     title: dinnerTitle,
                     start_date: `${dateStr}T20:00:00`,
-                    end_date: `${dateStr}T20:45:00`
+                    end_date: `${dateStr}T21:00:00`
                 });
 
                 // --- 5. バイト本体 (バイトDB) ---
