@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <h3>📅 うおww</h3>
+    <h3>📅 うおwww</h3>
 
     <div class="card">
         <label>対象月</label>
@@ -78,8 +78,8 @@
                 await postData({
                     db_type: "sleep",
                     title: isNextDayWork ? "就寝(B)" : "就寝(A)",
-                    start_date: `${dateStr}T${sleepTime}`,
-                    end_date: `${dateStr}T${sleependTime}`
+                    start_date: `${dateStr}T${sleepTime}:00`,
+                    end_date: `${dateStr}T${sleependTime}:00`
                 });
 
                 // 2. バイト予定 (db_type: work)
