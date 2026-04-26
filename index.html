@@ -2,95 +2,149 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Notion Bulk Logger (Time Support)</title>
+    <title>Notion Bulk Logger (Monthly & Sleep)</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 450px; line-height: 1.5; }
-        .input-group { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dee2e6; }
-        .time-row { display: flex; gap: 10px; margin-top: 10px; }
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; line-height: 1.5; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .time-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .time-field { flex: 1; }
-        label { display: block; font-size: 0.8rem; color: #666; margin-bottom: 2px; }
-        input { padding: 8px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        label { display: block; font-size: 0.8rem; color: #555; font-weight: bold; margin-bottom: 4px; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
         
-        .btn-add { background: #28a745; color: white; border: none; width: 100%; padding: 10px; margin-top: 10px; cursor: pointer; border-radius: 4px; }
-        #dateList { border: 1px solid #ccc; padding: 10px; min-height: 50px; margin-bottom: 10px; border-radius: 4px; }
-        .date-item { background: #eee; padding: 8px; margin: 5px 0; border-radius: 4px; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        .btn { border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
+        .btn-add { background: #28a745; color: white; margin-top: 10px; }
+        .btn-send { background: #007bff; color: white; font-size: 1.1rem; }
+        .btn-clear { background: #dc3545; color: white; margin-top: 10px; }
         
-        .btn-send { background: #007bff; color: white; border: none; width: 100%; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; }
-        .btn-clear { background: #dc3545; color: white; border: none; width: 100%; margin-top: 5px; padding: 8px; cursor: pointer; border-radius: 4px; }
+        #dateList { border: 2px dashed #ccc; padding: 10px; border-radius: 8px; margin: 15px 0; max-height: 200px; overflow-y: auto; background: #fafafa; }
+        .date-item { background: #fff; border: 1px solid #eee; padding: 8px; margin: 5px 0; border-radius: 4px; font-size: 0.85rem; }
+        .tag-work { color: #d9534f; font-weight: bold; }
+        .tag-sleep { color: #5bc0de; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h3>📅 Notion一括登録 (時間指定)</h3>
-    
-    <div class="input-group">
-        <label>日付</label>
-        <input type="date" id="datePicker">
+    <h3>📅 月間スケジュール一括生成</h3>
+
+    <div class="card">
+        <label>対象の月</label>
+        <input type="month" id="monthPicker">
         
-        <div class="time-row">
-            <div class="time-field">
-                <label>開始</label>
-                <input type="time" id="startTime" value="06:00">
+        <div style="margin-top:15px;">
+            <label>バイトの勤務時間</label>
+            <div class="time-row">
+                <input type="time" id="workStart" value="06:00">
+                <input type="time" id="workEnd" value="09:00">
             </div>
-            <div class="time-field">
-                <label>終了</label>
-                <input type="time" id="endTime" value="09:00">
-            </div>
+            <label>バイト日の日付 (カンマ区切り、例: 1, 5, 10, 15)</label>
+            <input type="text" id="workDays" placeholder="1, 3, 5...">
+            <button class="btn btn-add" onclick="addWorkDays()">バイト日程を確定</button>
         </div>
-        <button class="btn-add" onclick="addSchedule()">リストに追加</button>
     </div>
 
-    <div id="dateList">（追加された予定がここに並びます）</div>
+    <div class="card">
+        <label>就寝時間の設定</label>
+        <div class="time-row">
+            <div class="time-field">
+                <label>通常 (A時間)</label>
+                <input type="time" id="sleepA" value="23:30">
+            </div>
+            <div class="time-field">
+                <label>バイト前夜 (B時間)</label>
+                <input type="time" id="sleepB" value="22:00">
+            </div>
+        </div>
+    </div>
 
-    <button class="btn-send" onclick="sendAllToNotion()">一括送信</button>
-    <button class="btn-clear" onclick="clearList()">リストを空にする</button>
+    <div id="dateList">（リストがここに表示されます）</div>
+
+    <button class="btn btn-send" onclick="generateAndSend()">一括生成して送信</button>
+    <button class="btn btn-clear" onclick="clearList()">リセット</button>
 
     <script>
-        let schedules = [];
-        document.getElementById('datePicker').valueAsDate = new Date();
+        let workDaysArray = []; // バイトがある日の「日(number)」を格納
+        const monthInput = document.getElementById('monthPicker');
+        
+        // 初期値を今月にセット
+        const now = new Date();
+        monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-        function addSchedule() {
-            const date = document.getElementById('datePicker').value;
-            const start = document.getElementById('startTime').value;
-            const end = document.getElementById('endTime').value;
-            
-            if (!date || !start || !end) return alert("全て入力してください");
-
-            schedules.push({ date, start, end });
-            render();
+        function addWorkDays() {
+            const input = document.getElementById('workDays').value;
+            workDaysArray = input.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            renderPreview();
         }
 
-        function render() {
+        function renderPreview() {
             const container = document.getElementById('dateList');
-            container.innerHTML = schedules.length === 0 ? "（空です）" : "";
-            schedules.forEach((s, index) => {
-                const div = document.createElement('div');
-                div.className = 'date-item';
-                div.innerHTML = `<span>${s.date} <b>${s.start} - ${s.end}</b></span>`;
-                container.appendChild(div);
-            });
+            if (workDaysArray.length === 0) {
+                container.innerHTML = "バイトの日を指定してください";
+                return;
+            }
+            container.innerHTML = `確定したバイト日: ${workDaysArray.join(', ')}日`;
         }
 
         function clearList() {
-            schedules = [];
-            render();
+            workDaysArray = [];
+            document.getElementById('workDays').value = "";
+            renderPreview();
         }
 
-        async function sendAllToNotion() {
-            if (schedules.length === 0) return alert("予定がありません");
-            const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
+        async function generateAndSend() {
+            const monthVal = monthInput.value;
+            if (!monthVal || workDaysArray.length === 0) return alert("月とバイト日を指定してください");
 
+            const [year, month] = monthVal.split('-').map(Number);
+            const lastDay = new Date(year, month, 0).getDate(); // 月末日を取得
+            
+            const sleepA = document.getElementById('sleepA').value;
+            const sleepB = document.getElementById('sleepB').value;
+            const workStart = document.getElementById('workStart').value;
+            const workEnd = document.getElementById('workEnd').value;
+
+            const finalPayload = [];
+
+            for (let day = 1; day <= lastDay; day++) {
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // 1. バイトの予定（その日がバイトなら追加）
+                if (workDaysArray.includes(day)) {
+                    finalPayload.push({
+                        date: dateStr,
+                        type: "Work",
+                        start: workStart,
+                        end: workEnd,
+                        title: "バイト"
+                    });
+                }
+
+                // 2. 就寝時間の予定（翌日がバイトならB、それ以外はA）
+                const isNextDayWork = workDaysArray.includes(day + 1);
+                finalPayload.push({
+                    date: dateStr,
+                    type: "Sleep",
+                    start: isNextDayWork ? sleepB : sleepA,
+                    end: "06:00", // 起床時間は固定または調整
+                    title: isNextDayWork ? "就寝(B時間)" : "就寝(A時間)"
+                });
+            }
+
+            // Webhook送信
+            const webhookUrl = "https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct";
             try {
                 const response = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dates: schedules }) // オブジェクトの配列を送信
+                    body: JSON.stringify({ items: finalPayload })
                 });
 
                 if (response.ok) {
-                    alert(schedules.length + "件送信しました！");
-                    clearList();
-                } else { alert("エラーが発生しました"); }
-            } catch (e) { alert("ネットワークエラー"); }
+                    alert(`${finalPayload.length}件のレコードを送信しました。`);
+                } else {
+                    alert("送信エラー");
+                }
+            } catch (e) {
+                alert("ネットワークエラー");
+            }
         }
     </script>
 </body>
