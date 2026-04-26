@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Notion Dual DB Logger - Stable</title>
+    <title>Notion Logger - Date Shift Mode</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f4f7f9; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
@@ -16,10 +16,10 @@
     </style>
 </head>
 <body>
-    <h3>📅 振分登録 (安定版)だってwwうおww</h3>
+    <h3>📅 就寝日スライド登録</h3>
 
     <div class="card">
-        <label>対象月</label>
+        <label>対象月（この月のカレンダーを埋めます）</label>
         <input type="month" id="monthPicker">
         
         <label>バイト日 (1, 3, 5...)</label>
@@ -31,13 +31,13 @@
     <div class="card">
         <label>就寝設定</label>
         <div style="display:flex; gap:10px;">
-            <input type="time" id="sleepA" value="23:00">
+            <input type="time" id="sleepA" value="23:30">
             <input type="time" id="sleepB" value="22:00">
         </div>
-        <div id="status">まず日程を確定してください</div>
+        <div id="status">日程を確定してください</div>
     </div>
 
-    <button class="btn btn-send" onclick="sendToNotion()">2. Notionへ一括送信</button>
+    <button class="btn btn-send" onclick="sendToNotion()">2. Notionへ送信</button>
 
     <script>
         let selectedWorkDays = [];
@@ -52,7 +52,7 @@
             const input = document.getElementById('workDays').value;
             if (!input) return alert("日付を入力してください");
             selectedWorkDays = input.split(/[,、\s]+/).map(d => parseInt(d)).filter(d => !isNaN(d)).sort((a,b) => a-b);
-            document.getElementById('status').innerHTML = "<b>確定:</b> " + selectedWorkDays.join(", ") + "日<br>準備ができました。送信ボタンを押してください。";
+            document.getElementById('status').innerHTML = "<b>確定:</b> " + selectedWorkDays.join(", ") + "日<br>就寝データは前月末〜今月末1日前で作成されます。";
         }
 
         async function sendToNotion() {
@@ -60,34 +60,63 @@
             
             const monthStr = document.getElementById('monthPicker').value;
             const [year, month] = monthStr.split('-').map(Number);
-            const lastDay = new Date(year, month, 0).getDate(); // その月の末日まで取得
+            
+            // --- 日付の計算 ---
+            // 今月の初日
+            const firstDayOfThisMonth = new Date(year, month - 1, 1);
+            // 前月の最終日
+            const lastDayOfPrevMonth = new Date(year, month - 1, 0);
+            // 今月の最終日
+            const lastDayOfThisMonth = new Date(year, month, 0);
             
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
 
             const btn = document.querySelector('.btn-send');
             btn.disabled = true;
-            btn.innerText = "処理中...";
+            btn.innerText = "送信中...";
 
-            for (let day = 1; day <= lastDay; day++) {
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            // --- 処理のメインループ ---
+            // 開始：前月の最終日
+            // 終了：今月の最終日の一日前 ( <= lastDay - 1 )
+            const totalDays = lastDayOfThisMonth.getDate();
+            
+            // ログ用
+            console.log("前月末:", lastDayOfPrevMonth.toDateString());
+            console.log("今月末日前:", (totalDays - 1) + "日");
+
+            for (let dayOffset = 0; dayOffset < totalDays; dayOffset++) {
+                // dayOffset=0 のときは前月の最終日、1のときは今月1日...
+                let targetDate = new Date(year, month - 1, dayOffset);
                 
-                // --- 1. 就寝予定 ---
-                const isNextDayWork = selectedWorkDays.includes(day + 1);
-                const sleepTime = isNextDayWork ? sB : sA;
+                // ループの初回（dayOffset=0）は前月の最終日に設定し直す
+                if(dayOffset === 0) {
+                    targetDate = lastDayOfPrevMonth;
+                }
+
+                const dateStr = formatDate(targetDate);
+                const currentDayNum = targetDate.getDate();
+                const isNextMonth = targetDate.getMonth() + 1 !== month;
+
+                // 明日がバイトか判定 (targetDateの翌日が selectedWorkDays に含まれるか)
+                const tomorrow = new Date(targetDate);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const isTomorrowWork = (tomorrow.getMonth() + 1 === month) && selectedWorkDays.includes(tomorrow.getDate());
+
+                // --- 1. 就寝予定の送信 ---
+                const sleepTime = isTomorrowWork ? sB : sA;
                 const sleependTime = addMinutesToTime(sleepTime, 45);
 
-                console.log(`${day}日目: 就寝データを送信`);
                 await postData({
                     db_type: "sleep",
-                    title: isNextDayWork ? "就寝(B)" : "就寝(A)",
+                    title: isTomorrowWork ? "就寝(B)" : "就寝(A)",
                     start_date: `${dateStr}T${sleepTime}:00`,
                     end_date: `${dateStr}T${sleependTime}:00`
                 });
 
-                // --- 2. バイト予定 ---
-                if (selectedWorkDays.includes(day)) {
-                    console.log(`${day}日目: バイトデータを送信`);
+                // --- 2. バイト予定の送信（今月の範囲内かつバイト日の場合のみ） ---
+                // バイトデータは「当日」の予定なので、targetDateが今月かつselectedWorkDaysにある場合
+                if (!isNextMonth && selectedWorkDays.includes(currentDayNum)) {
                     await postData({
                         db_type: "work",
                         title: "セブンバイト",
@@ -96,17 +125,21 @@
                     });
                 }
 
-                // 画面表示を更新
-                document.getElementById('status').innerText = `${day} / ${lastDay} 日目を完了...`;
-                
-                // 重要：Make側の負荷分散のために少し長めに待機 (0.5秒)
+                document.getElementById('status').innerText = `${dateStr} のデータを送信完了...`;
                 await new Promise(r => setTimeout(r, 500));
             }
 
-            alert("すべてのデータの送信が完了しました！");
-            document.getElementById('status').innerText = "完了しました。Notionを確認してください。";
+            alert("スライド登録が完了しました！");
+            document.getElementById('status').innerText = "完了しました。";
             btn.disabled = false;
-            btn.innerText = "2. Notionへ一括送信";
+        }
+
+        // YYYY-MM-DD 形式に変換
+        function formatDate(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         function addMinutesToTime(timeStr, addMinutes) {
@@ -120,15 +153,12 @@
 
         async function postData(payload) {
             try {
-                const response = await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
+                await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (!response.ok) throw new Error('Network response was not ok');
-            } catch (e) { 
-                console.error("送信失敗:", e); 
-            }
+            } catch (e) { console.error(e); }
         }
     </script>
 </body>
