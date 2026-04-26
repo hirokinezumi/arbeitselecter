@@ -74,18 +74,19 @@
                 // 1. 就寝予定 (db_type: sleep)
                 const isNextDayWork = selectedWorkDays.includes(day + 1);
                 const sleepTime = isNextDayWork ? sB : sA;
+                const sleependTime = addMinutesToTime(sleepTime, 45); // その45分後
                 await postData({
                     db_type: "sleep",
                     title: isNextDayWork ? "就寝(B)" : "就寝(A)",
-                    start_date: `${dateStr}T${sleepTime}:00`,
-                    end_date: `${dateStr}T23:59:59`
+                    start_date: `${dateStr}T${sleepTime}`,
+                    end_date: `${dateStr}T${sleependTime}`
                 });
 
                 // 2. バイト予定 (db_type: work)
                 if (selectedWorkDays.includes(day)) {
                     await postData({
                         db_type: "work",
-                        title: "セブン",
+                        title: "セブンバイト",
                         start_date: `${dateStr}T06:00:00`,
                         end_date: `${dateStr}T09:00:00`
                     });
@@ -99,6 +100,21 @@
             btn.innerText = "Notionへ送信 (DB振分実行)";
         }
 
+        function addMinutesToTime(timeStr, addMinutes) {
+            let [hours, minutes] = timeStr.split(':').map(Number);
+            
+            minutes += addMinutes;
+            
+            // 60分を超えたら繰り上げ
+            hours += Math.floor(minutes / 60);
+            minutes = minutes % 60;
+            
+            // 24時を超えたら0時に戻す
+            hours = hours % 24;
+            
+            // "HH:mm" 形式に整形して返す
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
         async function postData(payload) {
             try {
                 await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
