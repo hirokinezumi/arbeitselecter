@@ -171,7 +171,11 @@
                     });
 
                     // 夕食・風呂 (選択された曜日なら洗濯を追加)
-                    let dinnerTitle = selectedLaundryDays.includes(dayOfWeek) ? "夕食・風呂・洗濯" : "夕食・風呂";
+                    let dinnerTitle = selectedLaundryDays.includes(dayOfWeek) 
+                        ? "夕食・風呂（洗濯）" 
+                        : selectedCollectionDays.includes(dayOfWeek) 
+                            ? "夕食・風呂（洗濯とりこみ）" 
+                            : "夕食・風呂";
                     await postData({
                         db_type: "sleep", title: dinnerTitle,
                         start_date: `${dateStr}T20:00:00`,
