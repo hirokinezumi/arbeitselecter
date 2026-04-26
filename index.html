@@ -2,129 +2,126 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Notion Bulk Logger</title>
+    <title>Notion Logger Fix</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 500px; line-height: 1.5; background: #f0f2f5; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .time-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .time-field { flex: 1; }
-        label { display: block; font-size: 0.8rem; color: #555; font-weight: bold; margin-bottom: 4px; }
-        input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
-        .btn { border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; margin-top: 10px; }
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; background: #f4f7f9; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        label { display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; }
+        input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
         .btn-add { background: #28a745; color: white; }
-        .btn-send { background: #007bff; color: white; font-size: 1.1rem; }
-        .btn-clear { background: #dc3545; color: white; }
-        #dateList { border: 2px dashed #ccc; padding: 10px; border-radius: 8px; margin: 15px 0; background: #fafafa; min-height: 40px; }
+        .btn-send { background: #007bff; color: white; }
+        #status { padding: 10px; background: #e9ecef; border-radius: 5px; font-size: 0.9rem; min-height: 20px; }
     </style>
 </head>
 <body>
-    <h3>📅 スケジュール一括生成</h3>
+    <h3>📅 スケジュール登録</h3>
 
     <div class="card">
-        <label>対象の月</label>
+        <label>対象月</label>
         <input type="month" id="monthPicker">
         
-        <div style="margin-top:15px;">
-            <label>バイト時間 (開始 / 終了)</label>
-            <div class="time-row">
-                <input type="time" id="workStart" value="06:00">
-                <input type="time" id="workEnd" value="09:00">
-            </div>
-            <label>バイト日の日付 (例: 1, 5, 10)</label>
-            <input type="text" id="workDays" placeholder="カンマ区切りで入力">
-            <button class="btn btn-add" onclick="addWorkDays()">日程を確定</button>
-        </div>
+        <label>バイト日 (例: 1, 5, 12)</label>
+        <input type="text" id="workDays" placeholder="半角数字とカンマで入力">
+        
+        <button class="btn btn-add" onclick="confirmDays()">1. 日程を確定する</button>
     </div>
 
     <div class="card">
-        <label>就寝時間設定</label>
-        <div class="time-row">
-            <div class="time-field">
-                <label>通常 (A)</label>
-                <input type="time" id="sleepA" value="23:30">
-            </div>
-            <div class="time-field">
-                <label>バイト前夜 (B)</label>
-                <input type="time" id="sleepB" value="22:00">
-            </div>
+        <label>就寝時間 (A:通常 / B:バイト前夜)</label>
+        <div style="display:flex; gap:10px;">
+            <input type="time" id="sleepA" value="23:30">
+            <input type="time" id="sleepB" value="22:00">
         </div>
+        <div id="status">ここに確定した日程が出ます</div>
     </div>
 
-    <div id="dateList">バイトの日を入力してください</div>
-
-    <button class="btn btn-send" onclick="generateAndSend()">Notionへ送信</button>
-    <button class="btn btn-clear" onclick="clearList()">リセット</button>
+    <button class="btn btn-send" onclick="sendToNotion()">2. Notionへ送信</button>
 
     <script>
-        let workDaysArray = [];
-        const monthInput = document.getElementById('monthPicker');
-        
-        // 初期値をセット
-        const d = new Date();
-        monthInput.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        // グローバル変数
+        let selectedWorkDays = [];
 
-        function addWorkDays() {
-            const val = document.getElementById('workDays').value;
-            if(!val) return alert("日付を入力してください");
-            // カンマ区切りの数字を配列に変換
-            workDaysArray = val.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-            document.getElementById('dateList').innerText = "確定済み: " + workDaysArray.join(', ') + "日";
-        }
+        // ページ読み込み時に今月をセット
+        window.onload = () => {
+            const now = new Date();
+            document.getElementById('monthPicker').value = now.toISOString().substring(0, 7);
+        };
 
-        function clearList() {
-            workDaysArray = [];
-            document.getElementById('workDays').value = "";
-            document.getElementById('dateList').innerText = "リセットしました";
-        }
-
-        async function generateAndSend() {
-            if (workDaysArray.length === 0) return alert("先に「日程を確定」ボタンを押してください");
+        function confirmDays() {
+            const input = document.getElementById('workDays').value;
+            if (!input) {
+                alert("バイトの日付を入力してください");
+                return;
+            }
             
-            const [year, month] = monthInput.value.split('-').map(Number);
-            const lastDay = new Date(year, month, 0).getDate();
-            const finalPayload = [];
+            // カンマやスペースで区切って数字の配列にする
+            selectedWorkDays = input.split(/[,、\s]+/)
+                                   .map(d => parseInt(d))
+                                   .filter(d => !isNaN(d));
 
-            // 各種設定値の取得
+            document.getElementById('status').innerText = "確定: " + selectedWorkDays.join(", ") + "日";
+            console.log("確定した日:", selectedWorkDays);
+        }
+
+        async function sendToNotion() {
+            if (selectedWorkDays.length === 0) {
+                alert("先に「1. 日程を確定する」を押してください");
+                return;
+            }
+
+            const monthStr = document.getElementById('monthPicker').value;
+            const [year, month] = monthStr.split('-').map(Number);
+            const lastDay = new Date(year, month, 0).getDate();
+            
             const sA = document.getElementById('sleepA').value;
             const sB = document.getElementById('sleepB').value;
-            const wS = document.getElementById('workStart').value;
-            const wE = document.getElementById('workEnd').value;
+            
+            const payload = [];
 
             for (let day = 1; day <= lastDay; day++) {
                 const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                // 1. バイト当日
-                if (workDaysArray.includes(day)) {
-                    finalPayload.push({
+                // バイト当日 (06:00 - 09:00固定)
+                if (selectedWorkDays.includes(day)) {
+                    payload.push({
                         title: "セブン",
-                        start_date: `${dateStr}T${wS}:00`,
-                        end_date: `${dateStr}T${wE}:00`,
+                        start_date: `${dateStr}T06:00:00`,
+                        end_date: `${dateStr}T09:00:00`,
                         type: "Work"
                     });
                 }
 
-                // 2. 就寝（翌日がバイトならB、そうでなければA）
-                const isNextDayWork = workDaysArray.includes(day + 1);
+                // 就寝判定
+                const isNextDayWork = selectedWorkDays.includes(day + 1);
                 const sleepTime = isNextDayWork ? sB : sA;
-                finalPayload.push({
+                payload.push({
                     title: isNextDayWork ? "就寝(B)" : "就寝(A)",
                     start_date: `${dateStr}T${sleepTime}:00`,
-                    end_date: `${dateStr}T23:59:00`, // Notionエラー回避のため同日内に設定
+                    end_date: `${dateStr}T23:59:59`,
                     type: "Sleep"
                 });
             }
+
+            console.log("送信データ:", payload);
 
             try {
                 const response = await fetch("https://hook.eu1.make.com/dbm7geabnuzxoutgoz7h3v2cuyzhklct", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: finalPayload })
+                    body: JSON.stringify({ items: payload })
                 });
 
                 if (response.ok) {
-                    alert("送信完了！");
+                    alert("送信に成功しました！");
                 } else {
-                    alert("送信エラー。Make側の設定を確認してください。");
+                    alert("送信失敗。MakeのWebhookを確認してください。");
                 }
-            } catch (e) {
-                alert("ネットワークエラーが発生
+            } catch (err) {
+                console.error(err);
+                alert("ネットワークエラーが発生しました。");
+            }
+        }
+    </script>
+</body>
+</html>
